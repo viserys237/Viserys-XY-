@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAMES DEPLOYER BETA V1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #09090b; color: #fafafa; overflow-x: hidden; }
+        .glass { background: #121214; border: 1px solid #27272a; }
+        .terminal { font-family: 'JetBrains Mono', monospace; }
+        .h-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 100; padding: 40px; overflow-y: auto; }
+        #cAlert { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10001; }
+        .modal-ui { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+        
+        /* Loading & Intro CSS */
+        #introOverlay { position: fixed; inset: 0; background: #000; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 1s ease; }
+        .loader-bar { width: 150px; height: 2px; background: #27272a; position: relative; overflow: hidden; border-radius: 10px; }
+        .loader-fill { position: absolute; height: 100%; background: #3b82f6; width: 0%; transition: width 0.5s ease; }
+        
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #27272a; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: #fafafa; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(16px); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-5">
+    
+    <div id="introOverlay">
+        <div id="loadingBox" class="flex flex-col items-center space-y-4">
+            <h2 class="text-[10px] font-black tracking-[4px] text-zinc-500 uppercase">James Deployer</h2>
+            <div class="loader-bar"><div id="loadFill" class="loader-fill"></div></div>
+            <p id="loadText" class="text-[8px] font-bold text-zinc-600 uppercase italic">Downloading Assets...</p>
+        </div>
+        <button id="entryBtn" onclick="startApp()" class="hidden bg-blue-600/10 border border-blue-500/30 text-blue-500 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[4px] hover:bg-blue-600 hover:text-white transition-all shadow-2xl">Tap to Enter</button>
+    </div>
+
+    <div id="cAlert" class="bg-blue-600 text-white px-6 py-3 rounded-full font-bold text-[10px] uppercase tracking-[2px] shadow-2xl"></div>
+
+    <div id="domM" class="modal-ui">
+        <div class="glass p-8 rounded-3xl w-full max-w-xs space-y-6 text-center">
+            <h2 class="text-[10px] font-black text-blue-500 uppercase tracking-widest italic">Premium Offer</h2>
+            <p class="text-xs font-bold text-zinc-400 uppercase italic leading-relaxed">ERROR:FITUR MASIH DIKEMBANGKAN!.</p>
+            <div class="flex space-x-2">
+                <button onclick="document.getElementById('domM').style.display='none'" class="flex-1 bg-zinc-800 py-3 rounded-xl font-black uppercase text-[9px]">Gak Jadi</button>
+                <a href="https://wa.me/6285817889864" class="flex-1 bg-blue-600 py-3 rounded-xl font-black uppercase text-[9px] flex items-center justify-center text-center">Beli</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="thanksM" class="modal-ui">
+        <div class="glass p-8 rounded-3xl w-full max-w-xs space-y-6">
+            <h2 class="text-[10px] font-black text-blue-500 uppercase tracking-widest italic text-center underline">Special Thanks To</h2>
+            <div class="space-y-3 terminal text-[10px] text-zinc-400">
+                <p>MY FRIENDS</p>
+                <p>1. Adit</p>
+                <p>2. Barz</p>
+                <p>3. DanzDev</p>
+                <p>4. Nika</p>
+            </div>
+            <button onclick="document.getElementById('thanksM').style.display='none'" class="w-full bg-zinc-800 py-3 rounded-xl font-black uppercase text-[9px]">Close</button>
+        </div>
+    </div>
+
+    <div id="confirmDel" class="modal-ui">
+        <div class="glass p-8 rounded-3xl w-full max-w-xs space-y-6 text-center border-red-500/30">
+            <h2 class="text-[10px] font-black text-red-500 uppercase tracking-widest italic">Warning: Permanent Delete</h2>
+            <p id="delMsg" class="text-[10px] font-bold text-zinc-400 uppercase leading-relaxed"></p>
+            <div class="flex space-x-2">
+                <button onclick="closeDel()" class="flex-1 bg-zinc-800 py-3 rounded-xl font-black uppercase text-[9px]">Batal</button>
+                <button id="btnConfirm" class="flex-1 bg-red-600 py-3 rounded-xl font-black uppercase text-[9px]">Hapus Asli</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-full max-w-2xl flex justify-between items-center mb-4 px-2">
+        <div id="jam" class="text-[10px] font-bold text-zinc-500 tracking-[2px]">00:00:00</div>
+        <div class="flex flex-col items-center">
+            <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest italic">BETA V1</span>
+            <div class="flex items-center space-x-2 mt-1">
+                <span class="text-[8px] font-bold text-zinc-600 uppercase">Music</span>
+                <label class="switch">
+                    <input type="checkbox" id="musTog" checked onchange="togMus()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="flex flex-col items-end">
+            <div class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Quota: <span id="qDisplay">0/15</span></div>
+            <div id="tRegen" class="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter italic">Initializing...</div>
+        </div>
+    </div>
+
+    <div class="w-full max-w-2xl glass rounded-3xl overflow-hidden shadow-2xl">
+        <div class="px-8 py-5 border-b border-[#27272a] bg-[#161618]/50 flex flex-col space-y-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-lg font-800 italic uppercase">James <span class="text-blue-500">Deployer</span></h1>
+                <div class="flex space-x-2">
+                    <button onclick="document.getElementById('thanksM').style.display='flex'" class="text-[8px] font-black text-blue-500 uppercase border border-zinc-500/20 px-3 py-2 rounded-xl hover:bg-zinc-500/10 transition-all italic">Thanks To</button>
+                    <button onclick="document.getElementById('domM').style.display='flex'" class="bg-blue-600/10 border border-blue-500/30 text-blue-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">VIP</button>                                        
+                    <button onclick="tH()" class="text-[9px] font-black text-blue-500 uppercase border border-blue-500/20 px-4 py-2 rounded-full hover:bg-blue-500/10 transition-all">History</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-8 space-y-6">
+            <div class="text-center">
+                <p class="text-[10px] font-black italic uppercase text-red-500 mb-1 tracking-tighter">Root zip harus index.html atau index.php</p>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-[9px] font-black text-zinc-500 uppercase ml-1">Subdomain Name</label>
+                <input type="text" id="pN" placeholder="custom-subdomain" class="w-full bg-[#18181b] border border-[#27272a] p-4 rounded-xl text-blue-400 outline-none text-sm font-bold uppercase tracking-widest placeholder:text-zinc-800">
+            </div>
+
+            <div class="relative h-32 border-2 border-dashed border-[#27272a] rounded-2xl flex flex-col items-center justify-center bg-[#18181b]/50 cursor-pointer text-white">
+                <p id="fStat" class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center">Upload ZIP / HTML / PHP</p>
+                <input type="file" id="fI" class="absolute inset-0 opacity-0 cursor-pointer" accept=".zip,.html,.php">
+            </div>
+
+            <div id="logs" class="terminal bg-black/40 border border-[#27272a] rounded-xl p-4 h-28 overflow-y-auto text-[10px] text-zinc-400">
+                <div id="lC">Standby...</div><div id="rL" class="mt-2"></div>
+            </div>
+
+            <div class="space-y-3">
+                <button id="copyBtn" onclick="copyResult()" class="hidden w-full bg-zinc-800 text-zinc-400 font-black py-3 rounded-2xl text-[10px] uppercase tracking-[2px] border border-zinc-700 active:scale-95 transition-all italic">Copy Link Result</button>
+                <button onclick="exD()" id="btn" class="w-full bg-blue-600 text-white font-800 py-4 rounded-2xl text-[11px] uppercase tracking-[3px] active:scale-95 transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)]">Start Deployment</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="hP" class="h-panel">
+        <div class="max-w-md mx-auto">
+            <div class="flex justify-between items-center mb-10">
+                <h2 class="text-2xl font-black italic uppercase">History</h2>
+                <button onclick="tH()" class="text-blue-500 font-bold text-xs uppercase">Close</button>
+            </div>
+            <div id="hL" class="space-y-4 text-[10px]">Belum ada riwayat</div>
+        </div>
+    </div>
+
+    <script>
+        const _k = atob("dmNwXzZOYVgyZGVJS2JNSkhzdkhOZThiZTZWS0o3QWVHbUMzSE54QTRwMVRMSU5TbGtZaEc1MXB6YTFX");
+        let audio = new Audio('music1.m4a');
+        audio.loop = true;
+        let lastLink = "";
+
+        // IMPROVED LOADING LOGIC
+        window.addEventListener('load', () => {
+            const fill = document.getElementById('loadFill');
+            const txt = document.getElementById('loadText');
+            let progress = 0;
+            
+            // Simulasi download yang lancar
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    txt.innerText = "Assets Loaded!";
+                    document.getElementById('loadingBox').classList.add('hidden');
+                    document.getElementById('entryBtn').classList.remove('hidden');
+                }
+                fill.style.width = progress + '%';
+                txt.innerText = `Downloading Assets: ${Math.floor(progress)}%`;
+            }, 150);
+        });
+
+        function startApp() {
+            document.getElementById('introOverlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('introOverlay').style.display = 'none';
+                if(document.getElementById('musTog').checked) {
+                    audio.play().catch(e => console.log("Audio play failed, waiting for interaction."));
+                }
+            }, 1000);
+        }
+
+        function togMus() {
+            const isChecked = document.getElementById('musTog').checked;
+            isChecked ? audio.play() : audio.pause();
+        }
+
+        let maxQ = 15;
+        let q = JSON.parse(localStorage.getItem('j_q_local') || '{"v":10,"t":'+Date.now()+'}');
+        let itemToDelete = null;
+
+        function mAt(m){ 
+            const e=document.getElementById('cAlert'); 
+            e.innerText=m; e.style.display='block'; 
+            setTimeout(()=>{e.style.display='none';},3000); 
+        }
+
+        function copyResult() {
+            if(!lastLink) return;
+            navigator.clipboard.writeText(lastLink);
+            mAt("LINK COPIED!");
+        }
+
+        function uClock(){
+            document.getElementById('jam').innerText = new Date().toLocaleTimeString('id-ID');
+            const now = Date.now(), rt = 600000;
+            let diff = now - q.t;
+            if(q.v < maxQ){
+                let added = Math.floor(diff / rt);
+                if(added > 0){
+                    q.v = Math.min(maxQ, q.v + added);
+                    q.t = now - (diff % rt);
+                    localStorage.setItem('j_q_local', JSON.stringify(q));
+                }
+                let tl = rt - (diff % rt), m = Math.floor(tl / 60000), s = Math.floor((tl % 60000) / 1000);
+                document.getElementById('tRegen').innerText = `Regen: ${m}:${s < 10 ? '0'+s : s}`;
+            } else {
+                document.getElementById('tRegen').innerText = "Quota Full";
+            }
+            document.getElementById('qDisplay').innerText = `${q.v}/${maxQ}`;
+        }
+        setInterval(uClock, 1000);
+
+        function tH(){ 
+            const p=document.getElementById('hP'); 
+            p.style.display=p.style.display==='block'?'none':'block'; 
+            if(p.style.display==='block') rH(); 
+        }
+
+        function rH(){ 
+            const h=JSON.parse(localStorage.getItem('j_h_local')||'[]');
+            document.getElementById('hL').innerHTML=h.map((i, idx)=>`
+                <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex justify-between items-center">
+                    <div class="overflow-hidden mr-2">
+                        <p class="font-black uppercase truncate text-blue-400">${i.name}</p>
+                        <p class="text-[7px] text-zinc-600 uppercase mt-1">${i.date}</p>
+                    </div>
+                    <div class="flex space-x-1">
+                        <a href="${i.url}" target="_blank" class="px-3 py-1 bg-zinc-800 rounded uppercase font-black">Open</a>
+                        <button onclick="askDel(${idx})" class="px-3 py-1 bg-red-600/20 text-red-500 rounded uppercase font-black">Del</button>
+                    </div>
+                </div>
+            `).join('') || `<p class="text-center text-zinc-600 font-bold uppercase italic py-20">Belum ada deploy</p>`;
+        }
+
+        function askDel(idx){
+            const h=JSON.parse(localStorage.getItem('j_h_local')||'[]');
+            itemToDelete = { idx: idx, id: h[idx].id, name: h[idx].name };
+            document.getElementById('delMsg').innerText = `Hapus ${itemToDelete.name}?`;
+            document.getElementById('confirmDel').style.display = 'flex';
+            document.getElementById('btnConfirm').onclick = realDelete;
+        }
+
+        function closeDel(){
+            document.getElementById('confirmDel').style.display = 'none';
+        }
+
+        async function realDelete(){
+            if(!itemToDelete) return;
+            const b = document.getElementById('btnConfirm');
+            b.innerText = "DELETING..."; b.disabled = true;
+            try {
+                if(itemToDelete.id) {
+                    await fetch(`https://api.vercel.com/v13/deployments/${itemToDelete.id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': 'Bearer ' + _k }
+                    });
+                }
+                let h=JSON.parse(localStorage.getItem('j_h_local')||'[]');
+                h.splice(itemToDelete.idx, 1);
+                localStorage.setItem('j_h_local', JSON.stringify(h));
+                mAt("DELETED");
+                rH();
+                closeDel();
+            } catch(e) { mAt("FAILED"); }
+            b.innerText = "Hapus"; b.disabled = false;
+        }
+
+        document.getElementById('fI').onchange=(e)=>{ 
+            if(e.target.files[0]) document.getElementById('fStat').innerText=e.target.files[0].name; 
+        };
+
+        async function exD(){
+            if(q.v <= 0) return mAt("QUOTA HABIS!");
+            let n = document.getElementById('pN').value.trim().toLowerCase().replace(/\s+/g,'-'), 
+                f = document.getElementById('fI').files[0], 
+                l = document.getElementById('lC'), 
+                rL = document.getElementById('rL'), 
+                b = document.getElementById('btn'),
+                cp = document.getElementById('copyBtn');
+
+            if(!n || !f) return mAt("ISI DATA!");
+            const fullN = n.endsWith("-james") ? n : n + "-james";
+            b.disabled=true; b.innerText="DEPLOYING...";
+            l.innerHTML="> Preparing files...";
+            cp.classList.add('hidden');
+
+            try {
+                let p=[]; const ext=f.name.split('.').pop().toLowerCase();
+                if(ext==='zip'){
+                    const z=new JSZip(), c=await z.loadAsync(f);
+                    for(let x in c.files){
+                        if(!c.files[x].dir){
+                            const d=await c.files[x].async("uint8array");
+                            let t=x.endsWith('.php')&&!x.startsWith('api/')?'api/'+x:x;
+                            let bS=""; for(let i=0;i<d.length;i++) bS+=String.fromCharCode(d[i]);
+                            p.push({file:t, data:btoa(bS), encoding:'base64'});
+                        }
+                    }
+                } else {
+                    const fr=new FileReader(), rw=await new Promise(s=>{fr.onload=ev=>s(ev.target.result);fr.readAsArrayBuffer(f);});
+                    const d=new Uint8Array(rw);
+                    let bS=""; for(let i=0;i<d.length;i++) bS+=String.fromCharCode(d[i]);
+                    p.push({file:ext==='php'?'api/index.php':'index.html', data:btoa(bS), encoding:'base64'});
+                }
+                
+                l.innerHTML="> Deploying to Vercel...";
+                const rs = await fetch('https://api.vercel.com/v13/deployments?skipAutoDetectionConfirmation=1', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + _k, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        name: fullN, 
+                        files: p, 
+                        target: 'production',
+                        projectSettings: { framework: null } 
+                    })
+                });
+                
+                const d = await rs.json();
+                if(d.id){
+                    let ready = false;
+                    while(!ready){
+                        await new Promise(r => setTimeout(r, 2000));
+                        const check = await fetch(`https://api.vercel.com/v13/deployments/${d.id}`, {
+                            headers: { 'Authorization': 'Bearer ' + _k }
+                        });
+                        const res = await check.json();
+                        l.innerHTML = `> Status: ${res.readyState || res.status}...`;
+                        if(res.readyState === 'READY' || res.status === 'READY'){
+                            q.v--; 
+                            localStorage.setItem('j_q_local', JSON.stringify(q));
+                            lastLink = `https://${fullN}.vercel.app`;
+                            let h=JSON.parse(localStorage.getItem('j_h_local')||'[]');
+                            h.unshift({id: d.id, name:fullN, url:lastLink, date:new Date().toLocaleString('id-ID')});
+                            localStorage.setItem('j_h_local', JSON.stringify(h.slice(0,15)));
+                            l.innerHTML="<span class='text-blue-400'>> SUCCESS!</span>";
+                            rL.innerHTML=`<div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center"><a href="${lastLink}" target="_blank" class="text-white text-[10px] font-bold italic">${lastLink}</a></div>`;
+                            cp.classList.remove('hidden');
+                            mAt("SUCCESS!"); ready = true;
+                        }
+                        if(res.readyState === 'ERROR' || res.status === 'ERROR'){
+                            l.innerHTML="<span class='text-red-500'>> FAILED!</span>";
+                            ready = true;
+                        }
+                    }
+                } else { l.innerHTML="> Fail: "+ (d.error?.message || "Check Token"); }
+            } catch(e){ l.innerHTML="> Fatal Error: " + e.message; }
+            b.disabled=false; b.innerText="Start Deployment";
+        }
+    </script>
+</body>
+</html>
